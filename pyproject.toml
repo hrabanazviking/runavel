@@ -23,3 +23,6 @@ runavel = "runavel.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["runavel*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

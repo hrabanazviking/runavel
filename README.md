@@ -12,9 +12,16 @@ Rúnavél is a Python command-line tool that bridges the ancient runic tradition
 ## Installation
 
 ```bash
-cd ~/runavel
 pip install -e .
 ```
+
+## Testing
+
+```bash
+pytest
+```
+
+81 tests covering runes dataset, cipher encode/decode, divination engine, renderer output, and CLI commands.
 
 ## Commands
 
@@ -130,6 +137,10 @@ Forged by **Runa Gridweaver Freyjasdottir** in May 2026.
 Built on the Elder Futhark tradition and the grimoire work of **Yrsa Freydisdottir** (as preserved in the Norse Saga Engine).
 
 Runic divination is not fortune-telling. It is the art of reading the currents of wyrd — the great web of cause and consequence that the Norns weave at the well of Urdhr. The Norns do not determine your fate. They reveal its shape.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 
