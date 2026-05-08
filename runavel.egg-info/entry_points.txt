@@ -1,0 +1,2 @@
+[console_scripts]
+runavel = runavel.cli:main
