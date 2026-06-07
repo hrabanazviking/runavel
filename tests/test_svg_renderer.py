@@ -411,12 +411,15 @@ class TestSaveSVG:
         assert filepath.exists()
 
     def test_save_svg_utf8_encoding(self, fehu, tmp_path):
-        """SVG files should be saved with UTF-8 encoding for runic characters."""
+        """SVG files should be saved with UTF-8 encoding for special characters."""
         svg = render_rune_svg(fehu)
         filepath = tmp_path / "utf8_test.svg"
         save_svg(svg, filepath)
         content = filepath.read_text(encoding="utf-8")
-        assert "ᚠ" in content  # Fehu unicode character
+        # The renderer outputs runes as path elements, not Unicode chars.
+        # Verify UTF-8 encoding works by checking for special chars that ARE in output.
+        assert "Æ" in content  # "Freyja's Ætt" contains UTF-8 chars
+        assert '<?xml version="1.0" encoding="UTF-8"?>' in content
 
 
 class TestSavePNG:
