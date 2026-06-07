@@ -15,17 +15,26 @@ Usage:
     runavel futhark                  Display the full futhark table
     runavel info <rune>              Show detailed rune information
     runavel banner                   Display the Rúnavél banner
+    runavel render-rune <rune>       Render a single rune as SVG
+    runavel render-bindrune <names> Compose multiple runes into a bindrune
+    runavel render-spread [question] Render a divination spread as SVG
+    runavel render-circle            Render the futhark circle as SVG
+    runavel render-futhark           Render the full futhark table as SVG
 
 Examples:
     runavel encode "Hello world"
     runavel shift "Secret message" 7
     runavel spread "What guides my path?"
     runavel info Fehu
+    runavel render-rune Fehu -o fehu.svg
+    runavel render-bindrune Fehu Uruz -o protection.svg
+    runavel render-spread "What guides my path?" -o reading.svg
 """
 
 import argparse
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from .runes import RUNE_BY_NAME, ELDER_FUTHARK, AETTIR, Aett
 from .cipher import RunicCipher, CipherMode
@@ -35,6 +44,16 @@ from .renderer import (
     render_rune_banner,
     render_futhark_table,
     render_spread_visual,
+)
+from .svg_renderer import (
+    SVGOptions,
+    render_rune_svg,
+    render_bindrune_svg,
+    render_rune_circle_svg,
+    render_spread_svg,
+    render_futhark_table_svg,
+    save_svg,
+    save_png,
 )
 
 
@@ -176,6 +195,154 @@ def cmd_banner(args):
     print(render_rune_banner())
 
 
+def _resolve_output_path(args, default_name: str) -> Path:
+    """Resolve output path from args or generate default."""
+    if args.output:
+        return Path(args.output)
+    # Default to current directory
+    return Path(default_name)
+
+
+def _write_svg_or_png(svg_content: str, filepath: Path):
+    """Write SVG content to file, optionally converting to PNG."""
+    if filepath.suffix.lower() == ".png":
+        try:
+            save_png(svg_content, filepath)
+            print(f"\n  ✨ Written: {filepath}")
+        except ImportError as e:
+            print(f"\n  ⚠ PNG export requires cairosvg: {e}")
+            print(f"  Falling back to SVG...")
+            svg_path = filepath.with_suffix(".svg")
+            save_svg(svg_content, svg_path)
+            print(f"\n  ✨ Written: {svg_path}")
+    else:
+        save_svg(svg_content, filepath)
+        print(f"\n  ✨ Written: {filepath}")
+
+
+def cmd_render_rune(args):
+    """Render a single rune as SVG/PNG."""
+    name = args.rune.capitalize()
+    if name not in RUNE_BY_NAME:
+        # Try matching by unicode character
+        for rune in ELDER_FUTHARK:
+            if rune.unicode == args.rune:
+                name = rune.name
+                break
+        else:
+            print(f"\n  Unknown rune: {args.rune}")
+            print(f"  Available runes: {', '.join(r.name for r in ELDER_FUTHARK)}\n")
+            return
+
+    rune = RUNE_BY_NAME[name]
+    opts = SVGOptions(
+        width=args.width,
+        height=args.height,
+        show_metadata=not args.no_metadata,
+        border=not args.no_border,
+    )
+    svg = render_rune_svg(rune, options=opts)
+
+    if args.output:
+        filepath = Path(args.output)
+    else:
+        filepath = Path(f"{rune.name.lower()}.svg")
+
+    _write_svg_or_png(svg, filepath)
+
+
+def cmd_render_bindrune(args):
+    """Compose multiple runes into a bindrune SVG/PNG."""
+    rune_names = [name.capitalize() for name in args.runes]
+    # Validate
+    for name in rune_names:
+        if name not in RUNE_BY_NAME:
+            print(f"\n  Unknown rune: {name}")
+            print(f"  Available runes: {', '.join(r.name for r in ELDER_FUTHARK)}\n")
+            return
+
+    opts = SVGOptions(width=args.width, height=args.height)
+    svg = render_bindrune_svg(rune_names, options=opts, name=args.name)
+
+    if args.output:
+        filepath = Path(args.output)
+    else:
+        bindrune_name = "-".join(rune_names).lower()
+        filepath = Path(f"bindrune-{bindrune_name}.svg")
+
+    _write_svg_or_png(svg, filepath)
+
+
+def cmd_render_spread(args):
+    """Render a divination spread as SVG/PNG."""
+    question = args.question
+    div = Divination(seed=getattr(args, 'seed', None))
+
+    if args.aett:
+        spread = div.draw_three_aett(question=question)
+    else:
+        spread = div.draw_three_rune(question=question)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    spread.timestamp = timestamp
+
+    opts = SVGOptions(width=args.width, height=args.height)
+    svg = render_spread_svg(spread, options=opts)
+
+    if args.output:
+        filepath = Path(args.output)
+    else:
+        timestamp_file = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath = Path(f"spread-{timestamp_file}.svg")
+
+    _write_svg_or_png(svg, filepath)
+
+    # Also show the terminal interpretation
+    print()
+    interpretation = div.interpret(spread)
+    print(interpretation)
+    print()
+
+
+def cmd_render_circle(args):
+    """Render the futhark circle as SVG/PNG."""
+    highlight = []
+    if args.highlight:
+        for name in args.highlight:
+            r = RUNE_BY_NAME.get(name.capitalize())
+            if r:
+                highlight.append(r)
+            else:
+                print(f"  Warning: Unknown rune '{name}', skipping highlight")
+
+    opts = SVGOptions()
+    svg = render_rune_circle_svg(
+        radius=args.radius,
+        highlight_runes=highlight if highlight else None,
+        title=args.title,
+        options=opts,
+    )
+
+    if args.output:
+        filepath = Path(args.output)
+    else:
+        filepath = Path("futhark-circle.svg")
+
+    _write_svg_or_png(svg, filepath)
+
+
+def cmd_render_futhark(args):
+    """Render the full futhark table as SVG/PNG."""
+    svg = render_futhark_table_svg()
+
+    if args.output:
+        filepath = Path(args.output)
+    else:
+        filepath = Path("futhark-table.svg")
+
+    _write_svg_or_png(svg, filepath)
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -239,6 +406,53 @@ def main():
     # banner
     p_banner = subparsers.add_parser("banner", help="Display the Rúnavél banner")
     p_banner.set_defaults(func=cmd_banner)
+
+    # ── SVG Render Commands ────────────────────────────────────────
+
+    # render-rune
+    p_render_rune = subparsers.add_parser("render-rune", help="Render a single rune as SVG/PNG")
+    p_render_rune.add_argument("rune", help="Rune name (e.g., 'Fehu') or Unicode character")
+    p_render_rune.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    p_render_rune.add_argument("--width", type=int, default=400, help="SVG width (default: 400)")
+    p_render_rune.add_argument("--height", type=int, default=600, help="SVG height (default: 600)")
+    p_render_rune.add_argument("--no-metadata", action="store_true", help="Hide rune metadata from card")
+    p_render_rune.add_argument("--no-border", action="store_true", help="Hide border from card")
+    p_render_rune.set_defaults(func=cmd_render_rune)
+
+    # render-bindrune
+    p_render_bindrune = subparsers.add_parser("render-bindrune", help="Compose multiple runes into a bindrune SVG")
+    p_render_bindrune.add_argument("runes", nargs="+", help="Rune names to compose (e.g., Fehu Uruz)")
+    p_render_bindrune.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    p_render_bindrune.add_argument("--name", help="Optional name for the bindrune")
+    p_render_bindrune.add_argument("--width", type=int, default=400, help="SVG width (default: 400)")
+    p_render_bindrune.add_argument("--height", type=int, default=600, help="SVG height (default: 600)")
+    p_render_bindrune.set_defaults(func=cmd_render_bindrune)
+
+    # render-spread
+    p_render_spread = subparsers.add_parser("render-spread", help="Render a divination spread as SVG/PNG")
+    p_render_spread.add_argument("question", nargs="?", default=None,
+                                  help="Optional question for the spread")
+    p_render_spread.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    p_render_spread.add_argument("--aett", action="store_true",
+                                  help="Draw one rune from each ætt instead")
+    p_render_spread.add_argument("--seed", type=int, default=None,
+                                  help="Seed for reproducible spread")
+    p_render_spread.add_argument("--width", type=int, default=900, help="SVG width (default: 900)")
+    p_render_spread.add_argument("--height", type=int, default=650, help="SVG height (default: 650)")
+    p_render_spread.set_defaults(func=cmd_render_spread)
+
+    # render-circle
+    p_render_circle = subparsers.add_parser("render-circle", help="Render the futhark circle as SVG/PNG")
+    p_render_circle.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    p_render_circle.add_argument("--radius", type=int, default=180, help="Circle radius (default: 180)")
+    p_render_circle.add_argument("--highlight", nargs="*", help="Rune names to highlight")
+    p_render_circle.add_argument("--title", help="Title for the circle")
+    p_render_circle.set_defaults(func=cmd_render_circle)
+
+    # render-futhark
+    p_render_futhark = subparsers.add_parser("render-futhark", help="Render the full futhark table as SVG/PNG")
+    p_render_futhark.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    p_render_futhark.set_defaults(func=cmd_render_futhark)
 
     args = parser.parse_args()
 

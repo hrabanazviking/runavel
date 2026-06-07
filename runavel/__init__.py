@@ -50,6 +50,19 @@ from .renderer import (
     render_rune_stave,
     render_spread_visual,
 )
+from .svg_renderer import (
+    SVGOptions,
+    ELEMENT_COLORS,
+    AETT_COLORS,
+    RUNE_SVG_PATHS,
+    render_rune_svg,
+    render_bindrune_svg,
+    render_rune_circle_svg,
+    render_spread_svg,
+    render_futhark_table_svg,
+    save_svg,
+    save_png,
+)
 
 __all__ = [
     # Metadata
@@ -78,11 +91,23 @@ __all__ = [
     "SpreadPosition",
     "SpreadType",
     "quick_reading",
-    # Renderer
+    # Renderer (terminal)
     "render_futhark_table",
     "render_rune_banner",
     "render_rune_card",
     "render_rune_circle",
     "render_rune_stave",
     "render_spread_visual",
+    # SVG Renderer
+    "SVGOptions",
+    "ELEMENT_COLORS",
+    "AETT_COLORS",
+    "RUNE_SVG_PATHS",
+    "render_rune_svg",
+    "render_bindrune_svg",
+    "render_rune_circle_svg",
+    "render_spread_svg",
+    "render_futhark_table_svg",
+    "save_svg",
+    "save_png",
 ]
