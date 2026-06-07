@@ -16,10 +16,18 @@ Usage:
     runavel info <rune>              Show detailed rune information
     runavel banner                   Display the Rúnavél banner
     runavel render-rune <rune>       Render a single rune as SVG
+    runavel render-stave <rune>     Render a pure rune stave (no card/metadata)
     runavel render-bindrune <names> Compose multiple runes into a bindrune
     runavel render-spread [question] Render a divination spread as SVG
     runavel render-circle            Render the futhark circle as SVG
     runavel render-futhark           Render the full futhark table as SVG
+    runavel render-all <dir>        Batch export all 24 rune cards to directory
+
+Render options:
+    --theme <name>    Apply a style theme (norse, light, runestone, blood, ice, minimal)
+    --stdout          Output SVG content to stdout instead of a file
+    -o <path>         Output file path (.svg or .png)
+    --format <fmt>    Force output format (svg or png), overrides file extension
 
 Examples:
     runavel encode "Hello world"
@@ -27,8 +35,12 @@ Examples:
     runavel spread "What guides my path?"
     runavel info Fehu
     runavel render-rune Fehu -o fehu.svg
+    runavel render-rune Fehu --theme ice -o fehu.svg
+    runavel render-stave Fehu -o fehu_stave.svg
     runavel render-bindrune Fehu Uruz -o protection.svg
     runavel render-spread "What guides my path?" -o reading.svg
+    runavel render-all ./rune_cards --theme light
+    runavel render-rune Tiwaz --stdout
 """
 
 import argparse
@@ -47,11 +59,15 @@ from .renderer import (
 )
 from .svg_renderer import (
     SVGOptions,
+    THEME_PRESETS,
+    THEME_NAMES,
     render_rune_svg,
+    render_stave_svg,
     render_bindrune_svg,
     render_rune_circle_svg,
     render_spread_svg,
     render_futhark_table_svg,
+    render_all_rune_cards,
     save_svg,
     save_png,
 )
@@ -195,20 +211,18 @@ def cmd_banner(args):
     print(render_rune_banner())
 
 
-def _resolve_output_path(args, default_name: str) -> Path:
-    """Resolve output path from args or generate default."""
-    if args.output:
-        return Path(args.output)
-    # Default to current directory
-    return Path(default_name)
-
-
 def _build_svg_options(args) -> SVGOptions:
-    """Build SVGOptions from CLI args (style customization)."""
-    kwargs = {
-        "width": getattr(args, "width", 400),
-        "height": getattr(args, "height", 600),
-    }
+    """Build SVGOptions from CLI args (style customization + themes)."""
+    # Start with theme defaults if a theme is specified
+    kwargs = {}
+    if hasattr(args, "theme") and args.theme:
+        theme = THEME_PRESETS.get(args.theme)
+        if theme:
+            kwargs.update(theme)
+
+    # Override with explicit args (these take precedence over theme)
+    kwargs["width"] = getattr(args, "width", kwargs.get("width", 400))
+    kwargs["height"] = getattr(args, "height", kwargs.get("height", 600))
     if hasattr(args, "stroke_color") and args.stroke_color:
         kwargs["stroke_color"] = args.stroke_color
     if hasattr(args, "background") and args.background:
@@ -224,9 +238,38 @@ def _build_svg_options(args) -> SVGOptions:
     return SVGOptions(**kwargs)
 
 
-def _write_svg_or_png(svg_content: str, filepath: Path):
-    """Write SVG content to file, optionally converting to PNG."""
-    if filepath.suffix.lower() == ".png":
+def _resolve_format(args, filepath: Path) -> str:
+    """Determine output format from --format flag or file extension."""
+    fmt = getattr(args, "format", None)
+    if fmt:
+        return fmt.lower()
+    # Fall back to file extension
+    ext = filepath.suffix.lower().lstrip(".")
+    if ext == "png":
+        return "png"
+    return "svg"
+
+
+def _write_output(svg_content: str, args, default_name: str):
+    """Write SVG content to file, stdout, or PNG based on args."""
+    # If --stdout, write SVG to stdout
+    if getattr(args, "stdout_output", False):
+        sys.stdout.write(svg_content)
+        return
+
+    # Determine output path
+    if args.output:
+        filepath = Path(args.output)
+    else:
+        filepath = Path(default_name)
+
+    # Resolve format (explicit --format overrides extension)
+    fmt = _resolve_format(args, filepath)
+
+    if fmt == "png":
+        # If format is png but path says .svg, fix the extension
+        if filepath.suffix.lower() != ".png":
+            filepath = filepath.with_suffix(".png")
         try:
             save_png(svg_content, filepath)
             print(f"\n  ✨ Written: {filepath}")
@@ -237,6 +280,9 @@ def _write_svg_or_png(svg_content: str, filepath: Path):
             save_svg(svg_content, svg_path)
             print(f"\n  ✨ Written: {svg_path}")
     else:
+        # SVG format — ensure .svg extension
+        if filepath.suffix.lower() != ".svg" and filepath.suffix.lower() != ".png":
+            filepath = filepath.with_suffix(".svg")
         save_svg(svg_content, filepath)
         print(f"\n  ✨ Written: {filepath}")
 
@@ -259,12 +305,8 @@ def cmd_render_rune(args):
     opts = _build_svg_options(args)
     svg = render_rune_svg(rune, options=opts)
 
-    if args.output:
-        filepath = Path(args.output)
-    else:
-        filepath = Path(f"{rune.name.lower()}.svg")
-
-    _write_svg_or_png(svg, filepath)
+    default_name = f"{rune.name.lower()}.svg"
+    _write_output(svg, args, default_name)
 
 
 def cmd_render_bindrune(args):
@@ -280,13 +322,8 @@ def cmd_render_bindrune(args):
     opts = _build_svg_options(args)
     svg = render_bindrune_svg(rune_names, options=opts, name=args.name)
 
-    if args.output:
-        filepath = Path(args.output)
-    else:
-        bindrune_name = "-".join(rune_names).lower()
-        filepath = Path(f"bindrune-{bindrune_name}.svg")
-
-    _write_svg_or_png(svg, filepath)
+    default_name = f"bindrune-{'-'.join(rune_names).lower()}.svg"
+    _write_output(svg, args, default_name)
 
 
 def cmd_render_spread(args):
@@ -305,13 +342,9 @@ def cmd_render_spread(args):
     opts = _build_svg_options(args)
     svg = render_spread_svg(spread, options=opts)
 
-    if args.output:
-        filepath = Path(args.output)
-    else:
-        timestamp_file = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filepath = Path(f"spread-{timestamp_file}.svg")
-
-    _write_svg_or_png(svg, filepath)
+    timestamp_file = datetime.now().strftime("%Y%m%d_%H%M%S")
+    default_name = f"spread-{timestamp_file}.svg"
+    _write_output(svg, args, default_name)
 
     # Also show the terminal interpretation
     print()
@@ -339,12 +372,7 @@ def cmd_render_circle(args):
         options=opts,
     )
 
-    if args.output:
-        filepath = Path(args.output)
-    else:
-        filepath = Path("futhark-circle.svg")
-
-    _write_svg_or_png(svg, filepath)
+    _write_output(svg, args, "futhark-circle.svg")
 
 
 def cmd_render_futhark(args):
@@ -352,12 +380,51 @@ def cmd_render_futhark(args):
     opts = _build_svg_options(args)
     svg = render_futhark_table_svg(options=opts)
 
-    if args.output:
-        filepath = Path(args.output)
-    else:
-        filepath = Path("futhark-table.svg")
+    _write_output(svg, args, "futhark-table.svg")
 
-    _write_svg_or_png(svg, filepath)
+
+def cmd_render_stave(args):
+    """Render a pure rune stave (no card/metadata) as SVG/PNG."""
+    name = args.rune.capitalize()
+    if name not in RUNE_BY_NAME:
+        for rune in ELDER_FUTHARK:
+            if rune.unicode == args.rune:
+                name = rune.name
+                break
+        else:
+            print(f"\n  Unknown rune: {args.rune}")
+            print(f"  Available runes: {', '.join(r.name for r in ELDER_FUTHARK)}\n")
+            return
+
+    rune = RUNE_BY_NAME[name]
+    opts = _build_svg_options(args)
+    svg = render_stave_svg(rune, options=opts)
+
+    default_name = f"{rune.name.lower()}-stave.svg"
+    _write_output(svg, args, default_name)
+
+
+def cmd_render_all(args):
+    """Batch export all 24 Elder Futhark rune cards to a directory."""
+    opts = _build_svg_options(args)
+    fmt = getattr(args, "format", None) or "svg"
+
+    output_dir = Path(args.directory)
+    print(f"\n  ᛟ Exporting 24 rune cards to {output_dir}/ ...")
+
+    try:
+        paths = render_all_rune_cards(
+            output_dir=output_dir,
+            options=opts,
+            format=fmt,
+        )
+        print(f"\n  ✨ Exported {len(paths)} rune cards:")
+        for p in paths:
+            print(f"     {p}")
+        print()
+    except ImportError as e:
+        print(f"\n  ⚠ Export failed: {e}")
+        print(f"  Install with: pip install cairosvg\n")
 
 
 def main():
@@ -430,6 +497,12 @@ def main():
     def _add_style_args(parser, default_w=400, default_h=600):
         """Add common SVG style arguments to a render subparser."""
         parser.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+        parser.add_argument("--format", choices=["svg", "png"], default=None,
+                            help="Force output format (overrides file extension)")
+        parser.add_argument("--stdout", action="store_true", dest="stdout_output",
+                            help="Output SVG content to stdout instead of file")
+        parser.add_argument("--theme", choices=THEME_NAMES, default=None,
+                            help=f"Apply a style theme ({', '.join(THEME_NAMES)})")
         parser.add_argument("--width", type=int, default=default_w, help=f"SVG width (default: {default_w})")
         parser.add_argument("--height", type=int, default=default_h, help=f"SVG height (default: {default_h})")
         parser.add_argument("--stroke-color", help="Rune stroke color (hex, e.g. #D4A017)")
@@ -444,6 +517,12 @@ def main():
     p_render_rune.add_argument("--no-metadata", action="store_true", help="Hide rune metadata from card")
     p_render_rune.add_argument("--no-border", action="store_true", help="Hide border from card")
     p_render_rune.set_defaults(func=cmd_render_rune)
+
+    # render-stave
+    p_render_stave = subparsers.add_parser("render-stave", help="Render a pure rune stave (no card/metadata) as SVG/PNG")
+    p_render_stave.add_argument("rune", help="Rune name (e.g., 'Fehu') or Unicode character")
+    _add_style_args(p_render_stave, default_w=200, default_h=280)
+    p_render_stave.set_defaults(func=cmd_render_stave)
 
     # render-bindrune
     p_render_bindrune = subparsers.add_parser("render-bindrune", help="Compose multiple runes into a bindrune SVG")
@@ -475,6 +554,12 @@ def main():
     p_render_futhark = subparsers.add_parser("render-futhark", help="Render the full futhark table as SVG/PNG")
     _add_style_args(p_render_futhark)
     p_render_futhark.set_defaults(func=cmd_render_futhark)
+
+    # render-all
+    p_render_all = subparsers.add_parser("render-all", help="Batch export all 24 rune cards to a directory")
+    p_render_all.add_argument("directory", help="Output directory for rune card files")
+    _add_style_args(p_render_all)
+    p_render_all.set_defaults(func=cmd_render_all)
 
     args = parser.parse_args()
 

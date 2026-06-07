@@ -93,6 +93,82 @@ AETT_COLORS: dict[str, str] = {
 }
 
 
+# ── Theme Presets ────────────────────────────────────────────────────
+# Named style presets for quick visual customization.
+# Each theme is a dict of SVGOptions keyword arguments.
+
+THEME_PRESETS: dict[str, dict] = {
+    "norse": {
+        # Default deep-dark Norse theme
+        "width": 400,
+        "height": 600,
+        "stroke_color": "#D4A017",
+        "background": "#1A1A2E",
+        "text_color": "#E8D5B7",
+        "accent_color": "#D4A017",
+        "show_metadata": True,
+        "border": True,
+    },
+    "light": {
+        # Light parchment theme for printing
+        "width": 400,
+        "height": 600,
+        "stroke_color": "#4A3728",
+        "background": "#F5F0E1",
+        "text_color": "#2C1810",
+        "accent_color": "#8B4513",
+        "show_metadata": True,
+        "border": True,
+    },
+    "runestone": {
+        # Grey stone texture theme
+        "width": 400,
+        "height": 600,
+        "stroke_color": "#C0C0C0",
+        "background": "#3A3A3A",
+        "text_color": "#D0D0D0",
+        "accent_color": "#A0A0A0",
+        "show_metadata": True,
+        "border": True,
+    },
+    "blood": {
+        # Dark red and gold theme for war readings
+        "width": 400,
+        "height": 600,
+        "stroke_color": "#FFD700",
+        "background": "#2A0A0A",
+        "text_color": "#FFCCAA",
+        "accent_color": "#CC0000",
+        "show_metadata": True,
+        "border": True,
+    },
+    "ice": {
+        # Icy blue-white theme for winter readings
+        "width": 400,
+        "height": 600,
+        "stroke_color": "#B0E0E6",
+        "background": "#0A1628",
+        "text_color": "#E0F0FF",
+        "accent_color": "#4682B4",
+        "show_metadata": True,
+        "border": True,
+    },
+    "minimal": {
+        # Black and white for clean prints
+        "width": 400,
+        "height": 600,
+        "stroke_color": "#000000",
+        "background": "#FFFFFF",
+        "text_color": "#333333",
+        "accent_color": "#666666",
+        "show_metadata": True,
+        "border": False,
+    },
+}
+
+THEME_NAMES = list(THEME_PRESETS.keys())
+
+
 # ── Data Classes ────────────────────────────────────────────────────
 
 @dataclass
@@ -734,6 +810,96 @@ def render_futhark_table_svg(
 
     svg += _svg_footer()
     return svg
+
+
+# ── Pure Stave SVG ──────────────────────────────────────────────────
+
+def render_stave_svg(
+    rune: Rune,
+    options: Optional[SVGOptions] = None,
+) -> str:
+    """
+    Render a single rune stave as SVG — just the rune glyph itself,
+    no card, no metadata, no border. Pure form.
+
+    This is the minimalist rendering: the rune path rendered on a
+    clean background, suitable for icons, overlays, or compositing.
+
+    Args:
+        rune: The Rune object to render.
+        options: SVG styling options.
+
+    Returns:
+        SVG string for the pure rune stave.
+    """
+    opts = options or SVGOptions()
+    w = min(opts.width, 200)  # Stave cards are compact
+    h = min(opts.height, 280)
+
+    svg = _svg_header(w, h, opts.background)
+
+    path_data = _rune_path(rune)
+    if path_data:
+        # Scale the stave path to fit the compact card
+        padding = 20
+        stave_area_w = w - 2 * padding
+        stave_area_h = h - 2 * padding
+        scale_x = stave_area_w / 100
+        scale_y = stave_area_h / 200
+
+        # Center the stave in the card
+        translate_x = padding
+        translate_y = padding + (stave_area_h - 200 * scale_y) / 2
+
+        svg += f'  <g transform="translate({translate_x:.1f}, {translate_y:.1f}) scale({scale_x:.4f}, {scale_y:.4f})">\n'
+        svg += f'    <path d="{path_data}" fill="none" stroke="{opts.stroke_color}" '
+        svg += f'stroke-width="{opts.stroke_width / max(scale_x, scale_y):.2f}" '
+        svg += f'stroke-linecap="round" stroke-linejoin="round"/>\n'
+        svg += '  </g>\n'
+    else:
+        # Fallback: large Unicode character centered
+        svg += f'  <text x="{w//2}" y="{h//2}" font-family="{opts.font_family}" '
+        svg += f'font-size="{min(w, h) // 2}" fill="{opts.stroke_color}" text-anchor="middle" '
+        svg += f'dominant-baseline="central">{rune.unicode}</text>\n'
+
+    svg += _svg_footer()
+    return svg
+
+
+# ── Batch Export ────────────────────────────────────────────────────
+
+def render_all_rune_cards(
+    output_dir: Union[str, Path],
+    options: Optional[SVGOptions] = None,
+    format: str = "svg",
+) -> list[Path]:
+    """
+    Batch-export all 24 Elder Futhark rune cards to files.
+
+    Args:
+        output_dir: Directory to write files into.
+        options: SVG styling options.
+        format: Output format — "svg" or "png".
+
+    Returns:
+        List of paths to generated files.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    opts = options or SVGOptions()
+    paths = []
+
+    for rune in ELDER_FUTHARK:
+        svg = render_rune_svg(rune, options=opts)
+        ext = format if format in ("svg", "png") else "svg"
+        filepath = output_dir / f"{rune.name.lower()}.{ext}"
+        if ext == "png":
+            save_png(svg, filepath, width=opts.width, height=opts.height)
+        else:
+            save_svg(svg, filepath)
+        paths.append(filepath)
+
+    return paths
 
 
 # ── File Export ─────────────────────────────────────────────────────
