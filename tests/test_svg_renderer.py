@@ -437,6 +437,109 @@ class TestSavePNG:
             # Expected if cairosvg and Pillow are not installed
             pass
 
+    def test_save_png_with_cairosvg(self, fehu, tmp_path):
+        """PNG export with CairoSVG should produce a real image."""
+        try:
+            import cairosvg
+        except ImportError:
+            pytest.skip("cairosvg not installed")
+
+        svg = render_rune_svg(fehu)
+        filepath = tmp_path / "fehu_cairo.png"
+        result = save_png(svg, filepath)
+        assert filepath.exists()
+        assert filepath.stat().st_size > 1000  # Not a tiny placeholder
+
+
+# ── SVG Validation Tests ────────────────────────────────────────────
+
+class TestSVGValidation:
+    """Verify generated SVGs are well-formed XML."""
+
+    def _parse_svg(self, svg_content):
+        """Parse SVG string as XML, raising on errors."""
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(svg_content)
+
+    def test_all_rune_cards_valid_xml(self):
+        for rune in ELDER_FUTHARK:
+            svg = render_rune_svg(rune)
+            self._parse_svg(svg)  # Should not raise
+
+    def test_bindrune_valid_xml(self):
+        svg = render_bindrune_svg(["Fehu", "Uruz"])
+        self._parse_svg(svg)
+
+    def test_circle_valid_xml(self):
+        svg = render_rune_circle_svg(title="Test & Circle")
+        self._parse_svg(svg)
+
+    def test_spread_valid_xml(self):
+        div = Divination(seed=42)
+        spread = div.draw_three_rune(question="Test & <question>")
+        svg = render_spread_svg(spread)
+        self._parse_svg(svg)
+
+    def test_futhark_table_valid_xml(self):
+        svg = render_futhark_table_svg()
+        self._parse_svg(svg)
+
+    def test_special_chars_escaped_in_spread(self):
+        """Questions with &, <, > should be properly XML-escaped."""
+        div = Divination(seed=7)
+        spread = div.draw_three_rune(question='Will I win "the lottery" & become <rich>?')
+        svg = render_spread_svg(spread)
+        import xml.etree.ElementTree as ET
+        ET.fromstring(svg)  # Should not raise
+        assert "&amp;" in svg
+
+
+# ── Style Customization Tests ───────────────────────────────────────
+
+class TestStyleCustomization:
+    def test_custom_stroke_color(self):
+        opts = SVGOptions(stroke_color="#FF0000")
+        svg = render_rune_svg(RUNE_BY_NAME["Fehu"], options=opts)
+        assert "#FF0000" in svg
+
+    def test_custom_background(self):
+        opts = SVGOptions(background="#0D0D0D")
+        svg = render_rune_svg(RUNE_BY_NAME["Fehu"], options=opts)
+        assert "#0D0D0D" in svg
+
+    def test_custom_text_color(self):
+        opts = SVGOptions(text_color="#FFFFFF")
+        svg = render_rune_svg(RUNE_BY_NAME["Fehu"], options=opts)
+        assert "#FFFFFF" in svg
+
+    def test_custom_accent_color(self):
+        opts = SVGOptions(accent_color="#00FF88")
+        svg = render_rune_svg(RUNE_BY_NAME["Fehu"], options=opts)
+        assert "#00FF88" in svg
+
+    def test_all_custom_colors_in_circle(self):
+        opts = SVGOptions(
+            stroke_color="#FF0000",
+            background="#000000",
+            text_color="#FFFFFF",
+            accent_color="#00FF88",
+        )
+        svg = render_rune_circle_svg(options=opts)
+        assert "#000000" in svg  # Background
+        assert "#00FF88" in svg  # Accent
+
+    def test_all_custom_colors_in_spread(self):
+        opts = SVGOptions(
+            stroke_color="#FF0000",
+            background="#000000",
+            text_color="#FFFFFF",
+            accent_color="#00FF88",
+        )
+        div = Divination(seed=42)
+        spread = div.draw_three_rune(question="Styling test")
+        svg = render_spread_svg(spread, options=opts)
+        assert "#000000" in svg
+
 
 # ── Integration Tests ───────────────────────────────────────────────
 

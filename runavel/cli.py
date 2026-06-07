@@ -203,6 +203,27 @@ def _resolve_output_path(args, default_name: str) -> Path:
     return Path(default_name)
 
 
+def _build_svg_options(args) -> SVGOptions:
+    """Build SVGOptions from CLI args (style customization)."""
+    kwargs = {
+        "width": getattr(args, "width", 400),
+        "height": getattr(args, "height", 600),
+    }
+    if hasattr(args, "stroke_color") and args.stroke_color:
+        kwargs["stroke_color"] = args.stroke_color
+    if hasattr(args, "background") and args.background:
+        kwargs["background"] = args.background
+    if hasattr(args, "text_color") and args.text_color:
+        kwargs["text_color"] = args.text_color
+    if hasattr(args, "accent_color") and args.accent_color:
+        kwargs["accent_color"] = args.accent_color
+    if hasattr(args, "no_metadata"):
+        kwargs["show_metadata"] = not args.no_metadata
+    if hasattr(args, "no_border"):
+        kwargs["border"] = not args.no_border
+    return SVGOptions(**kwargs)
+
+
 def _write_svg_or_png(svg_content: str, filepath: Path):
     """Write SVG content to file, optionally converting to PNG."""
     if filepath.suffix.lower() == ".png":
@@ -235,12 +256,7 @@ def cmd_render_rune(args):
             return
 
     rune = RUNE_BY_NAME[name]
-    opts = SVGOptions(
-        width=args.width,
-        height=args.height,
-        show_metadata=not args.no_metadata,
-        border=not args.no_border,
-    )
+    opts = _build_svg_options(args)
     svg = render_rune_svg(rune, options=opts)
 
     if args.output:
@@ -261,7 +277,7 @@ def cmd_render_bindrune(args):
             print(f"  Available runes: {', '.join(r.name for r in ELDER_FUTHARK)}\n")
             return
 
-    opts = SVGOptions(width=args.width, height=args.height)
+    opts = _build_svg_options(args)
     svg = render_bindrune_svg(rune_names, options=opts, name=args.name)
 
     if args.output:
@@ -286,7 +302,7 @@ def cmd_render_spread(args):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     spread.timestamp = timestamp
 
-    opts = SVGOptions(width=args.width, height=args.height)
+    opts = _build_svg_options(args)
     svg = render_spread_svg(spread, options=opts)
 
     if args.output:
@@ -315,7 +331,7 @@ def cmd_render_circle(args):
             else:
                 print(f"  Warning: Unknown rune '{name}', skipping highlight")
 
-    opts = SVGOptions()
+    opts = _build_svg_options(args)
     svg = render_rune_circle_svg(
         radius=args.radius,
         highlight_runes=highlight if highlight else None,
@@ -333,7 +349,8 @@ def cmd_render_circle(args):
 
 def cmd_render_futhark(args):
     """Render the full futhark table as SVG/PNG."""
-    svg = render_futhark_table_svg()
+    opts = _build_svg_options(args)
+    svg = render_futhark_table_svg(options=opts)
 
     if args.output:
         filepath = Path(args.output)
@@ -409,12 +426,21 @@ def main():
 
     # ── SVG Render Commands ────────────────────────────────────────
 
+    # Shared style arguments for all render commands
+    def _add_style_args(parser, default_w=400, default_h=600):
+        """Add common SVG style arguments to a render subparser."""
+        parser.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+        parser.add_argument("--width", type=int, default=default_w, help=f"SVG width (default: {default_w})")
+        parser.add_argument("--height", type=int, default=default_h, help=f"SVG height (default: {default_h})")
+        parser.add_argument("--stroke-color", help="Rune stroke color (hex, e.g. #D4A017)")
+        parser.add_argument("--background", help="Background color (hex, e.g. #1A1A2E)")
+        parser.add_argument("--text-color", help="Text color (hex, e.g. #E8D5B7)")
+        parser.add_argument("--accent-color", help="Accent/border color (hex, e.g. #D4A017)")
+
     # render-rune
     p_render_rune = subparsers.add_parser("render-rune", help="Render a single rune as SVG/PNG")
     p_render_rune.add_argument("rune", help="Rune name (e.g., 'Fehu') or Unicode character")
-    p_render_rune.add_argument("-o", "--output", help="Output file path (.svg or .png)")
-    p_render_rune.add_argument("--width", type=int, default=400, help="SVG width (default: 400)")
-    p_render_rune.add_argument("--height", type=int, default=600, help="SVG height (default: 600)")
+    _add_style_args(p_render_rune)
     p_render_rune.add_argument("--no-metadata", action="store_true", help="Hide rune metadata from card")
     p_render_rune.add_argument("--no-border", action="store_true", help="Hide border from card")
     p_render_rune.set_defaults(func=cmd_render_rune)
@@ -422,28 +448,24 @@ def main():
     # render-bindrune
     p_render_bindrune = subparsers.add_parser("render-bindrune", help="Compose multiple runes into a bindrune SVG")
     p_render_bindrune.add_argument("runes", nargs="+", help="Rune names to compose (e.g., Fehu Uruz)")
-    p_render_bindrune.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    _add_style_args(p_render_bindrune)
     p_render_bindrune.add_argument("--name", help="Optional name for the bindrune")
-    p_render_bindrune.add_argument("--width", type=int, default=400, help="SVG width (default: 400)")
-    p_render_bindrune.add_argument("--height", type=int, default=600, help="SVG height (default: 600)")
     p_render_bindrune.set_defaults(func=cmd_render_bindrune)
 
     # render-spread
     p_render_spread = subparsers.add_parser("render-spread", help="Render a divination spread as SVG/PNG")
     p_render_spread.add_argument("question", nargs="?", default=None,
                                   help="Optional question for the spread")
-    p_render_spread.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    _add_style_args(p_render_spread, default_w=900, default_h=650)
     p_render_spread.add_argument("--aett", action="store_true",
                                   help="Draw one rune from each ætt instead")
     p_render_spread.add_argument("--seed", type=int, default=None,
                                   help="Seed for reproducible spread")
-    p_render_spread.add_argument("--width", type=int, default=900, help="SVG width (default: 900)")
-    p_render_spread.add_argument("--height", type=int, default=650, help="SVG height (default: 650)")
     p_render_spread.set_defaults(func=cmd_render_spread)
 
     # render-circle
     p_render_circle = subparsers.add_parser("render-circle", help="Render the futhark circle as SVG/PNG")
-    p_render_circle.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    _add_style_args(p_render_circle, default_w=520, default_h=520)
     p_render_circle.add_argument("--radius", type=int, default=180, help="Circle radius (default: 180)")
     p_render_circle.add_argument("--highlight", nargs="*", help="Rune names to highlight")
     p_render_circle.add_argument("--title", help="Title for the circle")
@@ -451,7 +473,7 @@ def main():
 
     # render-futhark
     p_render_futhark = subparsers.add_parser("render-futhark", help="Render the full futhark table as SVG/PNG")
-    p_render_futhark.add_argument("-o", "--output", help="Output file path (.svg or .png)")
+    _add_style_args(p_render_futhark)
     p_render_futhark.set_defaults(func=cmd_render_futhark)
 
     args = parser.parse_args()

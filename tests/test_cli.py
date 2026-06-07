@@ -59,3 +59,56 @@ class TestCLI:
             main()
         captured = capsys.readouterr()
         assert "R Ú N A V É L" in captured.out or "RÚNAVÉL" in captured.out
+
+
+class TestCLIRenderCommands:
+    """Tests for SVG/PNG render CLI commands."""
+
+    def test_render_rune_svg(self, capsys, tmp_path):
+        output = str(tmp_path / "fehu.svg")
+        with patch("sys.argv", ["runavel", "render-rune", "Fehu", "-o", output]):
+            main()
+        captured = capsys.readouterr()
+        import os
+        assert os.path.exists(output)
+        content = open(output, encoding="utf-8").read()
+        assert "Fehu" in content
+
+    def test_render_rune_custom_style(self, capsys, tmp_path):
+        output = str(tmp_path / "styled.svg")
+        with patch("sys.argv", ["runavel", "render-rune", "Fehu", "-o", output,
+                                 "--stroke-color", "#FF0000", "--background", "#000000"]):
+            main()
+        content = open(output, encoding="utf-8").read()
+        assert "#FF0000" in content
+        assert "#000000" in content
+
+    def test_render_bindrune_svg(self, capsys, tmp_path):
+        output = str(tmp_path / "bind.svg")
+        with patch("sys.argv", ["runavel", "render-bindrune", "Fehu", "Uruz", "-o", output,
+                                 "--name", "test bind"]):
+            main()
+        captured = capsys.readouterr()
+        import os
+        assert os.path.exists(output)
+
+    def test_render_circle_svg(self, capsys, tmp_path):
+        output = str(tmp_path / "circle.svg")
+        with patch("sys.argv", ["runavel", "render-circle", "-o", output,
+                                 "--title", "Test Circle"]):
+            main()
+        content = open(output, encoding="utf-8").read()
+        assert "Test Circle" in content
+
+    def test_render_futhark_svg(self, capsys, tmp_path):
+        output = str(tmp_path / "futhark.svg")
+        with patch("sys.argv", ["runavel", "render-futhark", "-o", output]):
+            main()
+        content = open(output, encoding="utf-8").read()
+        assert "ELDER FUTHARK" in content
+
+    def test_render_rune_unknown_rune(self, capsys):
+        with patch("sys.argv", ["runavel", "render-rune", "Zzzzz"]):
+            main()
+        captured = capsys.readouterr()
+        assert "Unknown rune" in captured.out

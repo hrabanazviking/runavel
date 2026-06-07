@@ -16,7 +16,7 @@ This module provides:
 - Terminal rune rendering and circle visualizations
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Runa Gridweaver Freyjasdottir"
 
 from .runes import (

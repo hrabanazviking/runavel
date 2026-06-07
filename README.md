@@ -15,13 +15,18 @@ Rúnavél is a Python command-line tool that bridges the ancient runic tradition
 pip install -e .
 ```
 
+For PNG export support:
+```bash
+pip install -e ".[png]"
+```
+
 ## Testing
 
 ```bash
 pytest
 ```
 
-140 tests covering runes dataset, cipher encode/decode, divination engine, renderer output, and CLI commands.
+153 tests covering runes dataset, cipher encode/decode, divination engine, SVG/PNG rendering, terminal rendering, and CLI commands.
 
 ## Commands
 
@@ -72,6 +77,48 @@ runavel info ᚦ
 runavel banner
 ```
 
+### SVG/PNG Rendering
+
+Rúnavél can render runes and spreads as beautiful SVG or PNG images, with customizable styles:
+
+```bash
+# Render a single rune as SVG
+runavel render-rune Fehu -o fehu.svg
+
+# Render with custom style
+runavel render-rune Algiz --stroke-color "#FF0000" --background "#000000" -o algiz.svg
+
+# Render as PNG (requires cairosvg: pip install -e ".[png]")
+runavel render-rune Fehu -o fehu.png
+
+# Render a bindrune (composed overlay of multiple runes)
+runavel render-bindrune Algiz Sowilo --name "Victory Shield" -o victory.svg
+
+# Render a divination spread
+runavel render-spread "What guides my path?" -o reading.svg
+runavel render-spread "What guides my path?" --aett --seed 42 -o aett_reading.svg
+
+# Render the futhark circle
+runavel render-circle --title "Norns' Wheel" -o circle.svg
+runavel render-circle --highlight Fehu Uruz Thurisaz --title "ᚠᚢᚦ Guardian Force" -o highlighted.svg
+
+# Render the full futhark table
+runavel render-futhark -o futhark.svg
+```
+
+All render commands support style customization:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--stroke-color` | Rune stroke color | `#D4A017` (runic gold) |
+| `--background` | Background color | `#1A1A2E` (deep night) |
+| `--text-color` | Text color | `#E8D5B7` (parchment cream) |
+| `--accent-color` | Border/accent color | `#D4A017` (gold accent) |
+| `--width` | Image width in pixels | Varies by command |
+| `--height` | Image height in pixels | Varies by command |
+| `--no-metadata` | Hide rune metadata (rune cards only) | off |
+| `--no-border` | Hide border (rune cards only) | off |
+
 ## The Three Cipher Modes
 
 ### 1. Substitution (Direct)
@@ -115,13 +162,14 @@ Each spread provides:
 
 ```
 runavel/
-├── runes.py        # Complete Elder Futhark dataset (24 Rune dataclasses)
-├── cipher.py       # Three cipher modes: Substitution, Shift, Wyrd
-├── divination.py   # Spread drawing, inversion, interpretation
-├── renderer.py     # Terminal art: staves, cards, banners, tables
-├── cli.py          # argparse CLI interface
-├── __init__.py     # Package metadata
-└── __main__.py     # Entry point
+├── runes.py          # Complete Elder Futhark dataset (24 Rune dataclasses)
+├── cipher.py         # Three cipher modes: Substitution, Shift, Wyrd
+├── divination.py     # Spread drawing, inversion, interpretation
+├── renderer.py       # Terminal art: staves, cards, banners, tables
+├── svg_renderer.py   # SVG/PNG generation: cards, bindrunes, circles, spreads
+├── cli.py            # argparse CLI interface
+├── __init__.py       # Package metadata & public API
+└── __main__.py       # Entry point
 ```
 
 ## Philosophy
