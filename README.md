@@ -21,7 +21,7 @@ pip install -e .
 pytest
 ```
 
-81 tests covering runes dataset, cipher encode/decode, divination engine, renderer output, and CLI commands.
+140 tests covering runes dataset, cipher encode/decode, divination engine, renderer output, and CLI commands.
 
 ## Commands
 
