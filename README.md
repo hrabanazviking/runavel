@@ -26,7 +26,7 @@ pip install -e ".[png]"
 pytest
 ```
 
-153 tests covering runes dataset, cipher encode/decode, divination engine, SVG/PNG rendering, terminal rendering, and CLI commands.
+159 tests covering runes dataset, cipher encode/decode, divination engine, SVG/PNG rendering, terminal rendering, and CLI commands.
 
 ## Commands
 
