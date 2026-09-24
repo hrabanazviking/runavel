@@ -85,6 +85,9 @@ Rúnavél can render runes and spreads as beautiful SVG or PNG images, with cust
 # Render a single rune as SVG
 runavel render-rune Fehu -o fehu.svg
 
+# Render a pure rune stave (no card, no metadata)
+runavel render-stave Fehu -o fehu_stave.svg
+
 # Render with custom style
 runavel render-rune Algiz --stroke-color "#FF0000" --background "#000000" -o algiz.svg
 
@@ -104,6 +107,10 @@ runavel render-circle --highlight Fehu Uruz Thurisaz --title "ᚠᚢᚦ Guardian
 
 # Render the full futhark table
 runavel render-futhark -o futhark.svg
+
+# Batch export all 24 rune cards to a directory
+runavel render-all ./rune_cards
+runavel render-all ./rune_cards --theme light
 ```
 
 All render commands support style customization:
@@ -122,7 +129,7 @@ All render commands support style customization:
 ## The Three Cipher Modes
 
 ### 1. Substitution (Direct)
-The simplest mode. Each phoneme maps directly to its corresponding rune. "F" → Fehu, "Th" → Thurisaz, etc. Fully reversible.
+The simplest mode. Each phoneme maps directly to its corresponding rune. "F" → Fehu, "Th" → Thurisaz, etc. Reversible up to phonetic mergers: c/k, v/w, and y/j share runes, q is rendered with the k-rune (ᚲ), and x expands to "ks" (ᚲᛊ).
 
 ### 2. Shift (Caesar-style)
 A key number shifts positions along the 24-rune futhark. Similar to a Caesar cipher but applied to the futhark ring. Requires the same key to decode. Default key is 3 (Þurs-shift, after the 3rd rune Thurisaz).
@@ -181,6 +188,8 @@ Rúnavél does not treat the futhark as a codebook. Each rune is a frozen datacl
 ## Credits
 
 Forged by **Runa Gridweaver Freyjasdottir** in May 2026.
+
+Actively maintained fork of Runa's original at [runafreyjasdottir/runavel](https://github.com/runafreyjasdottir/runavel).
 
 Built on the Elder Futhark tradition and the grimoire work of **Yrsa Freydisdottir** (as preserved in the Norse Saga Engine).
 

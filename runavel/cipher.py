@@ -151,6 +151,22 @@ class RunicCipher:
             # Single character phoneme
             is_upper = char.isupper()
             phoneme = char.lower()
+
+            # q and x have no Elder Futhark runes of their own:
+            # q takes the k-sound (ᚲ), x expands to "ks" (ᚲᛊ),
+            # mirroring historical runic practice.
+            if phoneme == "q":
+                phoneme = "k"
+            elif phoneme == "x":
+                k_rune = self._phoneme_to_rune("k")
+                s_rune = self._phoneme_to_rune("s")
+                if k_rune is not None and s_rune is not None:
+                    result.append(k_rune.unicode + s_rune.unicode)
+                else:
+                    result.append("᛬")  # Unknown rune marker
+                i += 1
+                continue
+
             rune = self._phoneme_to_rune(phoneme, capitalize=is_upper)
 
             if rune:

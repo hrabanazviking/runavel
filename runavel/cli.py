@@ -145,7 +145,7 @@ def cmd_draw(args):
 def cmd_spread(args):
     """Draw a three-rune spread."""
     question = args.question if args.question else None
-    div = Divination()
+    div = Divination(seed=getattr(args, "seed", None))
 
     if args.aett:
         spread = div.draw_three_aett(question=question)
@@ -476,6 +476,8 @@ def main():
                           help="Optional question for the spread")
     p_spread.add_argument("--aett", action="store_true",
                           help="Draw one rune from each ætt instead")
+    p_spread.add_argument("--seed", type=int, default=None,
+                          help="Seed for reproducible draws (testing/ritual use)")
     p_spread.set_defaults(func=cmd_spread)
 
     # futhark
